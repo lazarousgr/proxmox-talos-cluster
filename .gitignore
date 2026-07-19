@@ -16,5 +16,7 @@
 **/talosconfig
 **/kubeconfig
 **/controlplane.yaml
+talos-homelab/
 **/worker.yaml
 configs/
+.cursor/
