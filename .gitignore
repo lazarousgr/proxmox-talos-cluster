@@ -1,0 +1,20 @@
+# Terraform
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/crash.log
+**/crash.*.log
+**/override.tf
+**/override.tf.json
+**/*_override.tf
+**/*_override.tf.json
+
+# Secrets — copy terraform.tfvars.example to secret.auto.tfvars locally
+**/secret.auto.tfvars
+
+# Talos / Kubernetes credentials (never commit)
+**/talosconfig
+**/kubeconfig
+**/controlplane.yaml
+**/worker.yaml
+configs/

@@ -1,0 +1,7 @@
+proxmox_endpoint  = ""
+proxmox_api_token = ""
+proxmox_node_name = ""
+proxmox_node_name_pve2 = ""
+talos_version = ""
+talos_schematic_id = ""
+proxmox_ssh_private_key = ""
