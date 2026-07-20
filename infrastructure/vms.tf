@@ -1,7 +1,7 @@
 resource "proxmox_virtual_environment_vm" "cp_1" {
     name = "talos-cp"
     node_name = var.proxmox_node_name
-    vm_id = 800
+    vm_id = var.talos_cp_vm_id
 
     description = "Control plane for Talos cluster"
     tags = ["talos", "control-plane", "kubernetes"]
@@ -33,7 +33,7 @@ resource "proxmox_virtual_environment_vm" "cp_1" {
 
     network_device {
         bridge      = "vmbr0"
-        mac_address = "BC:24:11:88:B8:23"   # DHCP → 192.168.1.71
+        mac_address = var.talos_cp_mac
     }
 
     initialization {
@@ -54,7 +54,7 @@ resource "proxmox_virtual_environment_vm" "cp_1" {
 resource "proxmox_virtual_environment_vm" "wrk_1" {
     name = "talos-wrk1"
     node_name = var.proxmox_node_name
-    vm_id = 801
+    vm_id = var.talos_wrk_vm_id[0]
 
     description = "Worker node 1 for Talos cluster"
     tags = ["talos", "worker-node-1", "kubernetes"]
@@ -86,7 +86,7 @@ resource "proxmox_virtual_environment_vm" "wrk_1" {
 
     network_device {
         bridge      = "vmbr0"
-        mac_address = "BC:24:11:88:B8:24"   # DHCP → 192.168.1.72
+        mac_address = var.talos_wrk_mac[0]
     }
 
     initialization {
@@ -107,7 +107,7 @@ resource "proxmox_virtual_environment_vm" "wrk_1" {
 resource "proxmox_virtual_environment_vm" "wrk_2" {
     name = "talos-wrk2"
     node_name = var.proxmox_node_name_pve2
-    vm_id = 810
+    vm_id = var.talos_wrk_vm_id[1]
 
     description = "Worker node 2 for Talos cluster"
     tags = ["talos", "worker-node-2", "kubernetes"]
@@ -139,7 +139,7 @@ resource "proxmox_virtual_environment_vm" "wrk_2" {
 
     network_device {
         bridge      = "vmbr0"
-        mac_address = "BC:24:11:88:B8:25"   # DHCP → 192.168.1.73
+        mac_address = var.talos_wrk_mac[1]
     }
 
     initialization {

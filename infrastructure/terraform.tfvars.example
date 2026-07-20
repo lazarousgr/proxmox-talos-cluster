@@ -1,7 +1,18 @@
-proxmox_endpoint  = ""
-proxmox_api_token = ""
-proxmox_node_name = ""
-proxmox_node_name_pve2 = ""
-talos_version = ""
-talos_schematic_id = ""
+proxmox_endpoint        = ""
+proxmox_api_token       = ""
+proxmox_node_name       = ""
+proxmox_node_name_pve2  = ""
+talos_version           = ""
+talos_schematic_id      = ""
 proxmox_ssh_private_key = ""
+
+cluster_name           = "talos-homelab"
+kubernetes_version     = "1.36.2"
+talos_controlplane_ip  = "" # e.g. 192.168.x.x
+talos_worker_ips       = [] # e.g. ["192.168.x.y", "192.168.x.z"]
+
+# Lab inventory — keep real values in secret.auto.tfvars only
+talos_cp_mac           = "" # e.g. "BC:24:11:xx:xx:xx"
+talos_wrk_mac          = [] # e.g. ["BC:24:11:xx:xx:xy", "BC:24:11:xx:xx:xz"]
+talos_cp_vm_id         = 800
+talos_wrk_vm_id        = [801, 810]
