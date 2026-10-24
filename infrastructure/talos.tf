@@ -153,59 +153,17 @@ resource "helm_release" "cilium" {
   chart      = "cilium"
   namespace  = "kube-system"
   version    = "1.17.4"
+  timeout    = 600  # 10 minutes — Cilium takes longer than the default 5m on fresh clusters
 
-  # Nodes are NotReady without a CNI — install Cilium before anything else
-  depends_on = [talos_cluster_kubeconfig.cluster]
+  # Load all settings from the shared values file (includes capabilities for Talos)
+  values = [file("${path.module}/../k8s/cilium/values.yaml")]
 
-  set {
-    name  = "kubeProxyReplacement"
-    value = "true"
-  }
+  # Override the control plane IP from Terraform variables
   set {
     name  = "k8sServiceHost"
     value = var.talos_controlplane_ip
   }
-  set {
-    name  = "k8sServicePort"
-    value = "6443"
-  }
 
-  # Talos-specific: do not auto-mount cgroups (Talos manages this)
-  set {
-    name  = "cgroup.autoMount.enabled"
-    value = "false"
-  }
-  set {
-    name  = "cgroup.hostRoot"
-    value = "/sys/fs/cgroup"
-  }
-
-  # L2 announcements replace MetalLB
-  set {
-    name  = "l2announcements.enabled"
-    value = "true"
-  }
-  set {
-    name  = "externalIPs.enabled"
-    value = "true"
-  }
-
-  # Hubble observability
-  set {
-    name  = "hubble.relay.enabled"
-    value = "true"
-  }
-  set {
-    name  = "hubble.ui.enabled"
-    value = "true"
-  }
-
-  set {
-    name  = "ipam.mode"
-    value = "kubernetes"
-  }
-  set {
-    name  = "bpf.masquerade"
-    value = "true"
-  }
+  # Nodes are NotReady without a CNI — install Cilium before anything else
+  depends_on = [talos_cluster_kubeconfig.cluster]
 }
