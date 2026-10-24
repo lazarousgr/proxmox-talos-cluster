@@ -49,7 +49,7 @@ variable "cluster_name" {
 variable "kubernetes_version" {
     type        = string
     description = "Kubernetes version without v prefix (must match Talos support matrix)"
-    default     = "1.36.2"
+    default     = "1.37.1"
 }
 
 variable "talos_controlplane_ip" {

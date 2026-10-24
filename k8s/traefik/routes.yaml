@@ -1,0 +1,95 @@
+# Kubernetes Gateway API routing — path-based routing via standard resources
+#
+# Spec: https://kubernetes.io/docs/concepts/services-networking/gateway/
+# API group: gateway.networking.k8s.io
+#
+# Prerequisites:
+#   1. Install Gateway API CRDs (standard channel):
+#      kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
+#   2. Traefik installed with Gateway API provider enabled (see values.yaml)
+#
+# Apply: kubectl apply -f routes.yaml
+# Replace host, service names, ports, and namespace to match your deployments.
+
+---
+# GatewayClass — tells the cluster that Traefik implements this class
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: traefik
+spec:
+  controllerName: traefik.io/gateway-controller
+
+---
+# Gateway — the actual listener (LAN IP assigned by Cilium L2 pool)
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: main-gateway
+  namespace: default          # change to your app namespace
+spec:
+  gatewayClassName: traefik
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: Same          # only allow HTTPRoutes from this namespace
+                              # change to All to allow routes from any namespace
+
+---
+# HTTPRoute — /api/* → backend
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: backend-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: main-gateway
+  hostnames:
+    - "app.home.lab"          # replace with your domain / local DNS name
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+      backendRefs:
+        - name: backend-svc   # replace with your backend Service name
+          port: 8080          # replace with your backend Service port
+
+---
+# HTTPRoute — /* → frontend (lower priority, catches everything else)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: frontend-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: main-gateway
+  hostnames:
+    - "app.home.lab"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: frontend-svc  # replace with your frontend Service name
+          port: 3000          # replace with your frontend Service port
+
+---
+# Optional: strip /api prefix before forwarding to backend
+# Use if your backend expects requests at / not /api/*
+# Requires Traefik experimental Gateway API features (see values.yaml)
+# apiVersion: gateway.networking.k8s.io/v1alpha2
+# kind: HTTPRoute
+# ...add a URLRewrite filter to the backend rule:
+#       filters:
+#         - type: URLRewrite
+#           urlRewrite:
+#             path:
+#               type: ReplacePrefixMatch
+#               replacePrefixMatch: /

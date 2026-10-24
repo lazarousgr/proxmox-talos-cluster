@@ -38,16 +38,23 @@ proxmox-talos-cluster/
 ├── README.md
 ├── .gitignore
 ├── proxmox-talos-gitops.md                  # optional playbook notes
-└── infrastructure/                         # Terraform (Proxmox + Talos)
-    ├── versions.tf                         # bpg/proxmox + siderolabs/talos
-    ├── providers.tf
-    ├── variables.tf
-    ├── images.tf                           # Talos image per Proxmox node
-    ├── vms.tf                              # control plane + workers
-    ├── talos.tf                            # secrets, config apply, bootstrap
-    ├── outputs.tf                          # kubeconfig / talosconfig (sensitive)
-    ├── terraform.tfvars.example            # placeholders only — safe to commit
-    └── secret.auto.tfvars                  # gitignored — never commit
+├── infrastructure/                         # Terraform (Proxmox + Talos)
+│   ├── versions.tf                         # bpg/proxmox + siderolabs/talos
+│   ├── providers.tf
+│   ├── variables.tf
+│   ├── images.tf                           # Talos image per Proxmox node
+│   ├── vms.tf                              # control plane + workers
+│   ├── talos.tf                            # secrets, config apply, bootstrap, CNI=none
+│   ├── outputs.tf                          # kubeconfig / talosconfig (sensitive)
+│   ├── terraform.tfvars.example            # placeholders only — safe to commit
+│   └── secret.auto.tfvars                  # gitignored — never commit
+└── k8s/                                    # Post-bootstrap cluster workloads
+    ├── cilium/
+    │   ├── values.yaml                     # Helm values (kube-proxy replacement, L2 announcements)
+    │   └── l2-pool.yaml                    # CiliumLoadBalancerIPPool + L2AnnouncementPolicy
+    └── traefik/
+        ├── values.yaml                     # Helm values for Traefik ingress / gateway
+        └── routes.yaml                     # IngressRoute: /api/* → backend, /* → frontend
 ```
 
 After apply, write client configs locally (gitignored), e.g. `talos-homelab/`.
@@ -274,13 +281,88 @@ Removes VMs, images, and Terraform-managed Talos state. Local `talos-homelab/` f
 
 ---
 
+## Step 4 — Install Cilium (CNI + load balancer)
+
+Terraform applies Talos machine configs with `cni: none` and `proxy.disabled: true`, so nodes will be **NotReady** until Cilium is installed. Do this immediately after `terraform apply`.
+
+```bash
+helm repo add cilium https://helm.cilium.io/
+helm repo update
+helm upgrade --install cilium cilium/cilium \
+  -n kube-system \
+  -f k8s/cilium/values.yaml
+```
+
+Wait for Cilium to be ready:
+
+```bash
+kubectl -n kube-system rollout status daemonset/cilium
+kubectl get nodes   # all nodes should show Ready
+```
+
+Then apply the L2 IP pool (gives LoadBalancer services a LAN IP from `192.168.1.200-210`):
+
+```bash
+kubectl apply -f k8s/cilium/l2-pool.yaml
+```
+
+> **Adjust the IP range** in `l2-pool.yaml` to match IPs your DHCP server will **not** assign.
+
+---
+
+## Step 5 — Install Traefik (API gateway)
+
+```bash
+helm repo add traefik https://helm.traefik.io/traefik
+helm repo update
+helm upgrade --install traefik traefik/traefik \
+  -n traefik --create-namespace \
+  -f k8s/traefik/values.yaml
+```
+
+Verify Traefik gets a LAN IP from Cilium:
+
+```bash
+kubectl get svc -n traefik
+# EXTERNAL-IP should show an IP from 192.168.1.200-210
+```
+
+### Kubernetes Gateway API routing
+
+`k8s/traefik/routes.yaml` uses the standard [Kubernetes Gateway API](https://kubernetes.io/docs/concepts/services-networking/gateway/) (`GatewayClass`, `Gateway`, `HTTPRoute`) — not Traefik-proprietary CRDs.
+
+Install the Gateway API CRDs first (one-time):
+
+```bash
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
+```
+
+Then apply the routing rules:
+
+```bash
+kubectl apply -f k8s/traefik/routes.yaml
+```
+
+Routing table:
+
+| Request | Routed to |
+|---------|-----------|
+| `app.home.lab/api/*` | `backend-svc` |
+| `app.home.lab/*` | `frontend-svc` |
+
+Edit `routes.yaml` — replace `app.home.lab`, service names, ports, and namespace to match your deployments before applying.
+
+If your backend expects requests at `/` rather than `/api/*`, use the `URLRewrite` filter shown (commented out) at the bottom of `routes.yaml`.
+
+---
+
 ## Later steps
 
 | Step | Goal |
 |------|------|
-| 5 | Bootstrap ArgoCD (or Flux) |
-| 6 | Platform via GitOps: Cilium → CSI → cert-manager → MetalLB / ingress |
-| 7 | Backups, upgrades, rebuild-from-zero docs |
+| 6 | Bootstrap ArgoCD (or Flux) |
+| 7 | Platform via GitOps: CSI → cert-manager → monitoring |
+| 8 | Backups, upgrades, rebuild-from-zero docs |
 
 ---
 
@@ -324,4 +406,6 @@ terraform output -raw kubeconfig > ../talos-homelab/kubeconfig
 | Design + Proxmox prep | Done (local) |
 | Talos image + VMs (Terraform) | Done |
 | Talos bootstrap (Terraform) | Done |
-| GitOps / Cilium | Not started |
+| Cilium CNI + L2 load balancer | Ready to apply (k8s/cilium/) |
+| Traefik gateway | Ready to apply (k8s/traefik/) |
+| GitOps / ArgoCD | Not started |

@@ -7,7 +7,7 @@ talos_schematic_id      = ""
 proxmox_ssh_private_key = ""
 
 cluster_name           = "talos-homelab"
-kubernetes_version     = "1.36.2"
+kubernetes_version     = "1.37.1"
 talos_controlplane_ip  = "" # e.g. 192.168.x.x
 talos_worker_ips       = [] # e.g. ["192.168.x.y", "192.168.x.z"]
 

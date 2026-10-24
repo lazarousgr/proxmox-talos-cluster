@@ -1,0 +1,50 @@
+# Traefik ingress / gateway — home lab
+# Install: helm upgrade --install traefik traefik/traefik -n traefik --create-namespace -f values.yaml
+# Repo:    helm repo add traefik https://helm.traefik.io/traefik
+
+deployment:
+  replicas: 1
+
+service:
+  type: LoadBalancer
+  # Cilium L2 pool will assign an IP from 192.168.1.200-210
+  # Pin to a specific IP if you want DNS to be stable:
+  # loadBalancerIP: 192.168.1.200
+
+ports:
+  web:
+    port: 80
+    expose:
+      default: true
+  websecure:
+    port: 443
+    expose:
+      default: true
+  traefik:
+    port: 9000   # dashboard (cluster-internal only)
+
+# Enable the Traefik dashboard (access via port-forward or IngressRoute)
+ingressRoute:
+  dashboard:
+    enabled: false   # set true once you add auth
+
+# Enable Kubernetes Gateway API provider (gateway.networking.k8s.io)
+# Install CRDs first:
+#   kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
+providers:
+  kubernetesGateway:
+    enabled: true             # Kubernetes Gateway API (GatewayClass / Gateway / HTTPRoute)
+  kubernetesIngress:
+    enabled: true             # keep for legacy Ingress resources
+  kubernetesCRD:
+    enabled: false            # Traefik-proprietary IngressRoute — not needed with Gateway API
+
+# Redirect HTTP → HTTPS globally
+# Uncomment once you have cert-manager issuing certs
+# additionalArguments:
+#   - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+#   - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+
+logs:
+  general:
+    level: INFO

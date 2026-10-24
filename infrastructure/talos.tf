@@ -38,6 +38,20 @@ data "talos_machine_configuration" "controlplane" {
       auto       = "off"
       hostname   = var.talos_node_hostnames.controlplane
     }),
+    # Disable Talos default CNI (Flannel) so Cilium can manage networking
+    yamlencode({
+      cluster = {
+        network = {
+          cni = {
+            name = "none"
+          }
+        }
+        # Disable kube-proxy — Cilium replaces it with eBPF
+        proxy = {
+          disabled = true
+        }
+      }
+    }),
   ]
 }
 
@@ -56,6 +70,19 @@ data "talos_machine_configuration" "worker" {
       machine = {
         install = {
           image = local.installer_image
+        }
+      }
+    }),
+    # Disable Talos default CNI (Flannel) so Cilium can manage networking
+    yamlencode({
+      cluster = {
+        network = {
+          cni = {
+            name = "none"
+          }
+        }
+        proxy = {
+          disabled = true
         }
       }
     }),
@@ -118,4 +145,67 @@ resource "talos_cluster_kubeconfig" "cluster" {
   endpoint             = var.talos_controlplane_ip
 
   depends_on = [talos_machine_bootstrap.cluster]
+}
+
+resource "helm_release" "cilium" {
+  name       = "cilium"
+  repository = "https://helm.cilium.io/"
+  chart      = "cilium"
+  namespace  = "kube-system"
+  version    = "1.17.4"
+
+  # Nodes are NotReady without a CNI — install Cilium before anything else
+  depends_on = [talos_cluster_kubeconfig.cluster]
+
+  set {
+    name  = "kubeProxyReplacement"
+    value = "true"
+  }
+  set {
+    name  = "k8sServiceHost"
+    value = var.talos_controlplane_ip
+  }
+  set {
+    name  = "k8sServicePort"
+    value = "6443"
+  }
+
+  # Talos-specific: do not auto-mount cgroups (Talos manages this)
+  set {
+    name  = "cgroup.autoMount.enabled"
+    value = "false"
+  }
+  set {
+    name  = "cgroup.hostRoot"
+    value = "/sys/fs/cgroup"
+  }
+
+  # L2 announcements replace MetalLB
+  set {
+    name  = "l2announcements.enabled"
+    value = "true"
+  }
+  set {
+    name  = "externalIPs.enabled"
+    value = "true"
+  }
+
+  # Hubble observability
+  set {
+    name  = "hubble.relay.enabled"
+    value = "true"
+  }
+  set {
+    name  = "hubble.ui.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "ipam.mode"
+    value = "kubernetes"
+  }
+  set {
+    name  = "bpf.masquerade"
+    value = "true"
+  }
 }
