@@ -39,6 +39,10 @@ providers:
   kubernetesCRD:
     enabled: false            # Traefik-proprietary IngressRoute — not needed with Gateway API
 
+# Disable the auto-created Gateway resource — we define our own in routes.yaml
+gateway:
+  enabled: false
+
 # Redirect HTTP → HTTPS globally
 # Uncomment once you have cert-manager issuing certs
 # additionalArguments:
